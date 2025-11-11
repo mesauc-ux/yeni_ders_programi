@@ -8777,6 +8777,7 @@ HTML_TEMPLATE = '''
         let draggedCell = null;
         let draggedData = null;
         let swapPendingData = null;
+        let swapInProgress = false; // ✅ Async race condition önleme flag'i
 
         function enableDragAndDrop() {
             const table = document.getElementById('weeklyPrintTable');
@@ -8804,6 +8805,13 @@ HTML_TEMPLATE = '''
                 // DRAG START
                 cell.addEventListener('dragstart', function(e) {
                     if (!this.textContent.trim()) return;
+
+                    // ✅ Swap devam ediyorsa yeni drag'i engelle
+                    if (swapInProgress) {
+                        e.preventDefault();
+                        showError('⏳ Lütfen mevcut swap işleminin tamamlanmasını bekleyin!');
+                        return;
+                    }
 
                     draggedCell = this;
                     this.classList.add('dragging');
@@ -9472,10 +9480,10 @@ HTML_TEMPLATE = '''
                 document.getElementById('swapConfirmModal').style.display = 'none';
 
                 // Uyarı modalını göster
-                showWarningModal(errorMsg, () => {
+                showWarningModal(errorMsg, async () => {
                     console.log('✅ DEVAM ET butonuna basıldı - performSwapWithWarning çağrılıyor');
                     // DEVAM ET - Aykırı swap yap ve renklendir
-                    performSwapWithWarning(savedDraggedCell, savedTargetCell, savedDraggedContent, savedTargetContent, savedTargetStudentNames, savedTargetIsClassLesson, savedDraggedData, savedSwapPendingData);
+                    await performSwapWithWarning(savedDraggedCell, savedTargetCell, savedDraggedContent, savedTargetContent, savedTargetStudentNames, savedTargetIsClassLesson, savedDraggedData, savedSwapPendingData);
                 }, () => {
                     console.log('❌ İPTAL ET butonuna basıldı');
                     // İPTAL ET - Tüm değişkenleri temizle
@@ -9488,7 +9496,7 @@ HTML_TEMPLATE = '''
 
             console.log('✅ HATA YOK - Normal swap yapılıyor');
             // HATA YOKSA NORMAL SWAP YAP
-            performNormalSwap(draggedCell, targetCell, draggedContent, targetContent, targetStudentNames, targetIsClassLesson);
+            await performNormalSwap(draggedCell, targetCell, draggedContent, targetContent, targetStudentNames, targetIsClassLesson);
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -9695,13 +9703,17 @@ HTML_TEMPLATE = '''
         // ═══════════════════════════════════════════════════════════
         // ✅ NORMAL SWAP (KURALLARA UYGUN)
         // ═══════════════════════════════════════════════════════════
-        function performNormalSwap(draggedCell, targetCell, draggedContent, targetContent, targetStudentNames, targetIsClassLesson) {
-            // swapPendingData'ya hedef ogrenci listesini ekle
-            swapPendingData.targetStudentNames = targetStudentNames;
-            swapPendingData.targetIsClassLesson = targetIsClassLesson;
+        async function performNormalSwap(draggedCell, targetCell, draggedContent, targetContent, targetStudentNames, targetIsClassLesson) {
+            // ✅ Swap işlemini başlat - race condition önleme
+            swapInProgress = true;
 
-            // ✅ 1️⃣ İLK ÖNCE: Hedef öğrencilerin öğretmenlerini al (globalScheduleData henüz ESKİ!)
-            const slotsToRemove = [];
+            try {
+                // swapPendingData'ya hedef ogrenci listesini ekle
+                swapPendingData.targetStudentNames = targetStudentNames;
+                swapPendingData.targetIsClassLesson = targetIsClassLesson;
+
+                // ✅ 1️⃣ İLK ÖNCE: Hedef öğrencilerin öğretmenlerini al (globalScheduleData henüz ESKİ!)
+                const slotsToRemove = [];
 
             // Kaynak slot bilgileri (draggedData)
             const draggedStudentNames = draggedData.studentNames || [draggedData.studentName];
@@ -9750,11 +9762,8 @@ HTML_TEMPLATE = '''
                 });
             }
 
-            // ✅ 2️⃣ SONRA: globalScheduleData'yı güncelle
-            updateGlobalScheduleDataAfterSwap(draggedData, swapPendingData);
-
-            // ✅ 3️⃣ EN SONRA: Aykırı swap kayıtlarını temizle (doğru öğretmen bilgileriyle)
-            // Border yeniden uygularken globalScheduleData güncel olacak
+            // ✅ 2️⃣: Aykırı swap kayıtlarını temizle
+            // NOT: globalScheduleData güncellenmesi saveSwapToBackend içinde yapılacak (duplicate çağrı önlendi)
             clearAykiriSwapForStudents(slotsToRemove);
 
             // YER DEĞİŞTİR
@@ -9782,24 +9791,36 @@ HTML_TEMPLATE = '''
                 targetCell.setAttribute('draggable', false);
             }
 
-            // Backend'e değişikliği gönder
-            saveSwapToBackend(draggedData, swapPendingData);
+            // Backend'e değişikliği gönder ve sonucu bekle
+            const backendSuccess = await saveSwapToBackend(draggedData, swapPendingData);
 
             // Popup'ı kapat
             cancelSwap();
 
-            // Başarı mesajı
-            showSuccessModal('Dersler başarıyla yer değiştirdi!');
+                // Başarı/Uyarı mesajı
+                if (backendSuccess) {
+                    showSuccessModal('Dersler başarıyla yer değiştirdi!');
+                } else {
+                    showError('⚠️ Swap UI\'da görünüyor ancak backend\'e kaydedilemedi!\n\nDegişiklik geçici olabilir. Lütfen sayfayı yenileyip kontrol edin.');
+                }
+            } finally {
+                // ✅ Her durumda flag'i serbest bırak
+                swapInProgress = false;
+            }
         }
 
         // ═══════════════════════════════════════════════════════════
         // ⚠️ AYKIRI SWAP (KURALLARA AYKIRI - 4PX RENKLİ BORDER)
         // ═══════════════════════════════════════════════════════════
-        function performSwapWithWarning(draggedCell, targetCell, draggedContent, targetContent, targetStudentNames, targetIsClassLesson, savedDraggedData, savedSwapPendingData) {
-            console.log('🟡 performSwapWithWarning ÇAĞRILDI');
-            console.log('📌 draggedContent:', draggedContent);
-            console.log('📌 targetContent:', targetContent);
-            console.log('📌 targetStudentNames:', targetStudentNames);
+        async function performSwapWithWarning(draggedCell, targetCell, draggedContent, targetContent, targetStudentNames, targetIsClassLesson, savedDraggedData, savedSwapPendingData) {
+            // ✅ Swap işlemini başlat - race condition önleme
+            swapInProgress = true;
+
+            try {
+                console.log('🟡 performSwapWithWarning ÇAĞRILDI');
+                console.log('📌 draggedContent:', draggedContent);
+                console.log('📌 targetContent:', targetContent);
+                console.log('📌 targetStudentNames:', targetStudentNames);
 
             // Kaydedilen swap verilerini güncelle
             savedSwapPendingData.targetStudentNames = targetStudentNames;
@@ -10034,20 +10055,25 @@ HTML_TEMPLATE = '''
             // 🔄 SAYACI HEMEN GÜNCELLE
             checkConflictsInBackground();
 
-            // Backend'e değişikliği gönder (kaydedilmiş verileri kullan)
-            saveSwapToBackend(savedDraggedData, savedSwapPendingData);
+                // Backend'e değişikliği gönder (kaydedilmiş verileri kullan)
+                // NOT: globalScheduleData zaten yukarıda (9936) güncellendi, duplicate önleme için alreadyUpdated=true
+                await saveSwapToBackend(savedDraggedData, savedSwapPendingData, true);
 
-            // Global değişkenleri temizle
-            draggedCell = null;
-            draggedData = null;
-            swapPendingData = null;
+                // Global değişkenleri temizle
+                draggedCell = null;
+                draggedData = null;
+                swapPendingData = null;
 
-            // Uyarı mesajı
-            const totalStudents = draggedStudentNames.length + (targetStudentNames ? targetStudentNames.length : 0);
-            showSuccessModal(`⚠️ Aykırı swap yapıldı!\n\n` +
-                `• ${totalStudents} öğrenci yer değiştirdi\n` +
-                `• ${conflictingStudentNames.length} öğrenci çakışma yaşadı\n` +
-                `• ${totalMarkedSlots} slot renkli border ile işaretlendi`);
+                // Uyarı mesajı
+                const totalStudents = draggedStudentNames.length + (targetStudentNames ? targetStudentNames.length : 0);
+                showSuccessModal(`⚠️ Aykırı swap yapıldı!\n\n` +
+                    `• ${totalStudents} öğrenci yer değiştirdi\n` +
+                    `• ${conflictingStudentNames.length} öğrenci çakışma yaşadı\n` +
+                    `• ${totalMarkedSlots} slot renkli border ile işaretlendi`);
+            } finally {
+                // ✅ Her durumda flag'i serbest bırak
+                swapInProgress = false;
+            }
         }
 
         function cancelSwap() {
@@ -10192,9 +10218,18 @@ HTML_TEMPLATE = '''
             draggedCell.setAttribute('draggable', false);
 
             // Backend'e kaydet
+            // ✅ Hedef hücrenin öğretmen bilgisini al
+            const targetCellIndex = Array.from(targetCell.parentElement.children).indexOf(targetCell);
+            const headerRow = targetCell.closest('table').querySelector('thead tr');
+            const targetTeacherHeader = headerRow ? headerRow.children[targetCellIndex] : null;
+            const targetTeacherText = targetTeacherHeader ? targetTeacherHeader.textContent : '';
+            const targetTeacherMatch = targetTeacherText.match(/\(([^)]+)\)/);
+            const targetTeacherName = targetTeacherMatch ? targetTeacherMatch[1].trim() : '';
+
             const targetData = {
                 targetDay: targetDay,
-                targetTime: targetTime
+                targetTime: targetTime,
+                targetTeacherName: targetTeacherName  // ✅ Öğretmen bilgisi eklendi
             };
             await saveSwapToBackend(draggedData, targetData);
 
@@ -10588,6 +10623,32 @@ HTML_TEMPLATE = '''
             return false; // Öğretmenin bu saatte dersi yok
         }
 
+        // ✅ HELPER: Güvenli hafta verisi çekme (week validation)
+        function getWeekData(weekNumber) {
+            /**
+             * Güvenli bir şekilde hafta verisini döndürür
+             * Tüm validasyon kontrollerini yapar
+             * @returns {Array|null} - Hafta verisi veya null
+             */
+            if (!globalScheduleData) {
+                console.error('❌ getWeekData: globalScheduleData yok!');
+                return null;
+            }
+
+            if (!globalScheduleData.weeks || !Array.isArray(globalScheduleData.weeks)) {
+                console.error('❌ getWeekData: weeks array yok veya geçersiz!');
+                return null;
+            }
+
+            const weekIndex = weekNumber - 1;
+            if (weekIndex < 0 || weekIndex >= globalScheduleData.weeks.length) {
+                console.error(`❌ getWeekData: Geçersiz hafta numarası: ${weekNumber}`);
+                return null;
+            }
+
+            return globalScheduleData.weeks[weekIndex];
+        }
+
         function extractDayName(dayString) {
             /**
              * Tarih içeren gün bilgisinden sadece gün adını çıkarır
@@ -10696,9 +10757,13 @@ HTML_TEMPLATE = '''
         // ═══════════════════════════════════════════════════════════
         // 💾 BACKEND'E SWAP KAYDET
         // ═══════════════════════════════════════════════════════════
-        async function saveSwapToBackend(sourceData, targetData) {
+        async function saveSwapToBackend(sourceData, targetData, alreadyUpdated = false) {
             // Bu fonksiyon backend'e değişikliği gönderir
             // Sınıf dersleri için TÜM öğrencileri gönder
+            // alreadyUpdated: globalScheduleData zaten güncellendiyse true (duplicate önleme)
+            // DÖNDÜRÜR: true (başarılı), false (başarısız)
+
+            let backendSuccess = false;
 
             try {
                 const response = await fetch('/swap_lessons', {
@@ -10726,18 +10791,28 @@ HTML_TEMPLATE = '''
                 });
 
                 if (!response.ok) {
-                    console.warn('Backend güncellemesi başarısız, ama değişiklik tabloda görünüyor');
+                    console.error('Backend güncellemesi başarısız:', response.status);
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Hata detayı:', errorData.error || 'Bilinmeyen hata');
+                    backendSuccess = false;
                 } else {
                     const result = await response.json();
                     console.log('Backend swap sonucu:', result.message);
+                    backendSuccess = true;
                 }
             } catch (error) {
-                console.warn('Backend bağlantı hatası:', error);
+                console.error('Backend bağlantı hatası:', error);
+                backendSuccess = false;
             }
 
-            // ✅ BACKEND BAŞARILI OLSUN YA DA OLMASIN - GLOBALSHEDULEDATA'YI GÜNCELLE
-            // Çünkü ekranda swap zaten yapıldı, validation için frontend verisini güncellememiz şart!
-            updateGlobalScheduleDataAfterSwap(sourceData, targetData);
+            // ✅ globalScheduleData'yı güncelle (duplicate önleme için koşullu)
+            // Eğer çağıran tarafından zaten güncellendiyse tekrar güncelleme
+            if (!alreadyUpdated) {
+                // Çünkü ekranda swap zaten yapıldı, validation için frontend verisini güncellememiz şart!
+                updateGlobalScheduleDataAfterSwap(sourceData, targetData);
+            }
+
+            return backendSuccess;
         }
 
         window.onload = function() {
@@ -16706,6 +16781,10 @@ def swap_lessons():
     source_student_names = source.get('studentNames', [source.get('student')])
     source_teacher = source.get('teacher', '')  # ✅ Kaynak öğretmen bilgisi
 
+    # ✅ NULL/EMPTY TEACHER CHECK - Kaynak öğretmen bilgisi zorunlu
+    if not source_teacher or not source_teacher.strip():
+        return jsonify({'error': 'Kaynak öğretmen bilgisi eksik veya geçersiz!'}), 400
+
     # HEDEF BOSSA (target.student None ise)
     if not target.get('student'):
         # BOŞ SLOTA TAŞIMA - SINIF veya BİREYSEL
@@ -16737,6 +16816,10 @@ def swap_lessons():
     # Hedef taraftaki TÜM dersleri bul (sınıf dersi olabilir)
     target_student_text = target.get('student')  # "11A (3 öğrenci)" veya "ZEYNEP YAVUZ"
     target_teacher = target.get('teacher', '')  # ✅ Hedef öğretmen bilgisi
+
+    # ✅ NULL/EMPTY TEACHER CHECK - Hedef dolu ise öğretmen bilgisi zorunlu
+    if not target_teacher or not target_teacher.strip():
+        return jsonify({'error': 'Hedef öğretmen bilgisi eksik veya geçersiz!'}), 400
 
     # ✅ Hedef slottaki dersleri bul - SADECE BU ÖĞRETMENİN DERSLERİ
     target_lessons = []
