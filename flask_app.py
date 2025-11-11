@@ -9715,87 +9715,87 @@ HTML_TEMPLATE = '''
                 // ✅ 1️⃣ İLK ÖNCE: Hedef öğrencilerin öğretmenlerini al (globalScheduleData henüz ESKİ!)
                 const slotsToRemove = [];
 
-            // Kaynak slot bilgileri (draggedData)
-            const draggedStudentNames = draggedData.studentNames || [draggedData.studentName];
-            draggedStudentNames.forEach(studentName => {
-                slotsToRemove.push({
-                    studentName: studentName,
-                    day: draggedData.day,
-                    time: draggedData.time,
-                    teacherName: draggedData.teacherName
+                // Kaynak slot bilgileri (draggedData)
+                const draggedStudentNames = draggedData.studentNames || [draggedData.studentName];
+                draggedStudentNames.forEach(studentName => {
+                    slotsToRemove.push({
+                        studentName: studentName,
+                        day: draggedData.day,
+                        time: draggedData.time,
+                        teacherName: draggedData.teacherName
+                    });
                 });
-            });
 
-            // Hedef slot bilgileri (swapPendingData)
-            // ✅ ÖNEMLİ: Hedef öğrencilerin öğretmenlerini ŞİMDİ al!
-            // updateGlobalScheduleDataAfterSwap() çağrılınca değişecek!
-            if (targetStudentNames && targetStudentNames.length > 0) {
-                targetStudentNames.forEach(studentName => {
-                    // globalScheduleData'dan bu öğrencinin bu gün/saatteki öğretmenini bul
-                    let studentTeacherName = swapPendingData.targetTeacherName || '';
+                // Hedef slot bilgileri (swapPendingData)
+                // ✅ ÖNEMLİ: Hedef öğrencilerin öğretmenlerini ŞİMDİ al!
+                // updateGlobalScheduleDataAfterSwap() çağrılınca değişecek!
+                if (targetStudentNames && targetStudentNames.length > 0) {
+                    targetStudentNames.forEach(studentName => {
+                        // globalScheduleData'dan bu öğrencinin bu gün/saatteki öğretmenini bul
+                        let studentTeacherName = swapPendingData.targetTeacherName || '';
 
-                    if (globalScheduleData && globalScheduleData.weeks) {
-                        const weekData = globalScheduleData.weeks[draggedData.week - 1];
-                        if (weekData) {
-                            const cleanTargetDay = extractDayName(swapPendingData.targetDay).toLocaleUpperCase('tr');
+                        if (globalScheduleData && globalScheduleData.weeks) {
+                            const weekData = globalScheduleData.weeks[draggedData.week - 1];
+                            if (weekData) {
+                                const cleanTargetDay = extractDayName(swapPendingData.targetDay).toLocaleUpperCase('tr');
 
-                            for (const lesson of weekData) {
-                                const lessonDayClean = extractDayName(lesson.day).toLocaleUpperCase('tr');
+                                for (const lesson of weekData) {
+                                    const lessonDayClean = extractDayName(lesson.day).toLocaleUpperCase('tr');
 
-                                if (lesson.student_name === studentName &&
-                                    lessonDayClean === cleanTargetDay &&
-                                    lesson.time === swapPendingData.targetTime) {
-                                    // Bu öğrencinin bu slottaki öğretmenini bulduk
-                                    studentTeacherName = lesson.teacher_name;
-                                    break;
+                                    if (lesson.student_name === studentName &&
+                                        lessonDayClean === cleanTargetDay &&
+                                        lesson.time === swapPendingData.targetTime) {
+                                        // Bu öğrencinin bu slottaki öğretmenini bulduk
+                                        studentTeacherName = lesson.teacher_name;
+                                        break;
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    slotsToRemove.push({
-                        studentName: studentName,
-                        day: swapPendingData.targetDay,
-                        time: swapPendingData.targetTime,
-                        teacherName: studentTeacherName
+                        slotsToRemove.push({
+                            studentName: studentName,
+                            day: swapPendingData.targetDay,
+                            time: swapPendingData.targetTime,
+                            teacherName: studentTeacherName
+                        });
                     });
-                });
-            }
+                }
 
-            // ✅ 2️⃣: Aykırı swap kayıtlarını temizle
-            // NOT: globalScheduleData güncellenmesi saveSwapToBackend içinde yapılacak (duplicate çağrı önlendi)
-            clearAykiriSwapForStudents(slotsToRemove);
+                // ✅ 2️⃣: Aykırı swap kayıtlarını temizle
+                // NOT: globalScheduleData güncellenmesi saveSwapToBackend içinde yapılacak (duplicate çağrı önlendi)
+                clearAykiriSwapForStudents(slotsToRemove);
 
-            // YER DEĞİŞTİR
-            draggedCell.textContent = targetContent;
-            targetCell.textContent = draggedContent;
+                // YER DEĞİŞTİR
+                draggedCell.textContent = targetContent;
+                targetCell.textContent = draggedContent;
 
-            // Sınıfları güncelle
-            if (targetContent.trim()) {
-                draggedCell.classList.add('draggable-cell');
-                draggedCell.classList.remove('empty-slot');
-                draggedCell.setAttribute('draggable', true);
-            } else {
-                draggedCell.classList.remove('draggable-cell');
-                draggedCell.classList.add('empty-slot');
-                draggedCell.setAttribute('draggable', false);
-            }
+                // Sınıfları güncelle
+                if (targetContent.trim()) {
+                    draggedCell.classList.add('draggable-cell');
+                    draggedCell.classList.remove('empty-slot');
+                    draggedCell.setAttribute('draggable', true);
+                } else {
+                    draggedCell.classList.remove('draggable-cell');
+                    draggedCell.classList.add('empty-slot');
+                    draggedCell.setAttribute('draggable', false);
+                }
 
-            if (draggedContent.trim()) {
-                targetCell.classList.add('draggable-cell');
-                targetCell.classList.remove('empty-slot');
-                targetCell.setAttribute('draggable', true);
-            } else {
-                targetCell.classList.remove('draggable-cell');
-                targetCell.classList.add('empty-slot');
-                targetCell.setAttribute('draggable', false);
-            }
+                if (draggedContent.trim()) {
+                    targetCell.classList.add('draggable-cell');
+                    targetCell.classList.remove('empty-slot');
+                    targetCell.setAttribute('draggable', true);
+                } else {
+                    targetCell.classList.remove('draggable-cell');
+                    targetCell.classList.add('empty-slot');
+                    targetCell.setAttribute('draggable', false);
+                }
 
-            // Backend'e değişikliği gönder ve sonucu bekle
-            const backendSuccess = await saveSwapToBackend(draggedData, swapPendingData);
+                // Backend'e değişikliği gönder ve sonucu bekle
+                const backendSuccess = await saveSwapToBackend(draggedData, swapPendingData);
 
-            // Popup'ı kapat
-            cancelSwap();
+                // Popup'ı kapat
+                cancelSwap();
 
                 // Başarı/Uyarı mesajı
                 if (backendSuccess) {
@@ -9822,17 +9822,17 @@ HTML_TEMPLATE = '''
                 console.log('📌 targetContent:', targetContent);
                 console.log('📌 targetStudentNames:', targetStudentNames);
 
-            // Kaydedilen swap verilerini güncelle
-            savedSwapPendingData.targetStudentNames = targetStudentNames;
-            savedSwapPendingData.targetIsClassLesson = targetIsClassLesson;
+                // Kaydedilen swap verilerini güncelle
+                savedSwapPendingData.targetStudentNames = targetStudentNames;
+                savedSwapPendingData.targetIsClassLesson = targetIsClassLesson;
 
-            // ═══════════════════════════════════════════════════════════
-            // 📋 ÖĞRENCİLERİN SINIF BİLGİLERİNİ AL (SWAP YAPMADAN ÖNCE!)
-            // ═══════════════════════════════════════════════════════════
-            const studentClassMap = {}; // {studentName: className}
+                // ═══════════════════════════════════════════════════════════
+                // 📋 ÖĞRENCİLERİN SINIF BİLGİLERİNİ AL (SWAP YAPMADAN ÖNCE!)
+                // ═══════════════════════════════════════════════════════════
+                const studentClassMap = {}; // {studentName: className}
 
-            // globalScheduleData'dan tüm öğrencilerin sınıf bilgisini al
-            if (globalScheduleData && globalScheduleData.weeks) {
+                // globalScheduleData'dan tüm öğrencilerin sınıf bilgisini al
+                if (globalScheduleData && globalScheduleData.weeks) {
                 const weekData = globalScheduleData.weeks[currentWeekView - 1];
                 if (weekData) {
                     weekData.forEach(lesson => {
@@ -9841,18 +9841,18 @@ HTML_TEMPLATE = '''
                         }
                     });
                 }
-            }
+                }
 
-            console.log('📚 studentClassMap:', studentClassMap);
+                console.log('📚 studentClassMap:', studentClassMap);
 
-            // ═══════════════════════════════════════════════════════════
-            // 🔍 ÖNCE ÇAKIŞMALARI TESPİT ET (SWAP YAPMADAN ÖNCE!)
-            // ═══════════════════════════════════════════════════════════
-            const conflictGroups = []; // [{studentName, conflicts: [], color}]
-            const conflictingStudentNames = []; // Sadece çakışan öğrenci isimleri
+                // ═══════════════════════════════════════════════════════════
+                // 🔍 ÖNCE ÇAKIŞMALARI TESPİT ET (SWAP YAPMADAN ÖNCE!)
+                // ═══════════════════════════════════════════════════════════
+                const conflictGroups = []; // [{studentName, conflicts: [], color}]
+                const conflictingStudentNames = []; // Sadece çakışan öğrenci isimleri
 
-            // 1️⃣ HEDEF ÖĞRENCİLERİN YENİ YERİNDEKİ ÇAKIŞMALARI
-            if (targetStudentNames && targetStudentNames.length > 0) {
+                // 1️⃣ HEDEF ÖĞRENCİLERİN YENİ YERİNDEKİ ÇAKIŞMALARI
+                if (targetStudentNames && targetStudentNames.length > 0) {
                 targetStudentNames.forEach(name => {
                     const studentClass = studentClassMap[name.toLocaleUpperCase('tr')];
                     console.log(`🔎 HEDEF öğrenci: ${name}, sınıf: ${studentClass}`);
@@ -9877,11 +9877,11 @@ HTML_TEMPLATE = '''
                         conflictingStudentNames.push(name);
                     }
                 });
-            }
+                }
 
-            // 2️⃣ KAYNAK ÖĞRENCİLERİN YENİ YERİNDEKİ ÇAKIŞMALARI
-            const draggedStudentNames = savedDraggedData.studentNames || [savedDraggedData.studentName];
-            draggedStudentNames.forEach(name => {
+                // 2️⃣ KAYNAK ÖĞRENCİLERİN YENİ YERİNDEKİ ÇAKIŞMALARI
+                const draggedStudentNames = savedDraggedData.studentNames || [savedDraggedData.studentName];
+                draggedStudentNames.forEach(name => {
                 const studentClass = studentClassMap[name.toLocaleUpperCase('tr')];
                 console.log(`🔎 KAYNAK öğrenci: ${name}, sınıf: ${studentClass}`);
                 const conflicts = findStudentConflictsAtTime(
@@ -9904,29 +9904,29 @@ HTML_TEMPLATE = '''
                     });
                     conflictingStudentNames.push(name);
                 }
-            });
+                });
 
-            console.log('📊 TOPLAM conflictGroups sayısı:', conflictGroups.length);
+                console.log('📊 TOPLAM conflictGroups sayısı:', conflictGroups.length);
 
-            // ═══════════════════════════════════════════════════════════
-            // 🔄 GLOBAL SCHEDULE DATA GÜNCELLE VE ESKİ VIOLATION'LARI TEMİZLE
-            // ═══════════════════════════════════════════════════════════
-            // ✅ 1️⃣ İLK ÖNCE: ESKİ VIOLATION SİLMEK İÇİN SLOT BİLGİLERİNİ TOPLA
-            // (globalScheduleData güncellenmeden ÖNCE öğretmen bilgisini al!)
-            const slotsToRemove = [];
+                // ═══════════════════════════════════════════════════════════
+                // 🔄 GLOBAL SCHEDULE DATA GÜNCELLE VE ESKİ VIOLATION'LARI TEMİZLE
+                // ═══════════════════════════════════════════════════════════
+                // ✅ 1️⃣ İLK ÖNCE: ESKİ VIOLATION SİLMEK İÇİN SLOT BİLGİLERİNİ TOPLA
+                // (globalScheduleData güncellenmeden ÖNCE öğretmen bilgisini al!)
+                const slotsToRemove = [];
 
-            // Kaynak slot bilgileri (draggedData)
-            draggedStudentNames.forEach(studentName => {
+                // Kaynak slot bilgileri (draggedData)
+                draggedStudentNames.forEach(studentName => {
                 slotsToRemove.push({
                     studentName: studentName,
                     day: savedDraggedData.day,
                     time: savedDraggedData.time,
                     teacherName: savedDraggedData.teacherName
                 });
-            });
+                });
 
-            // Hedef slot bilgileri (swapPendingData) - ÖĞRETMENİ globalScheduleData'dan al!
-            if (targetStudentNames && targetStudentNames.length > 0) {
+                // Hedef slot bilgileri (swapPendingData) - ÖĞRETMENİ globalScheduleData'dan al!
+                if (targetStudentNames && targetStudentNames.length > 0) {
                 const weekData = globalScheduleData?.weeks?.[currentWeekView - 1];
                 const cleanTargetDay = savedSwapPendingData.targetDay.toLocaleUpperCase('tr');
 
@@ -9954,47 +9954,47 @@ HTML_TEMPLATE = '''
                         teacherName: studentTeacherName
                     });
                 });
-            }
+                }
 
-            // ✅ 2️⃣ SONRA: globalScheduleData'yı güncelle
-            updateGlobalScheduleDataAfterSwap(savedDraggedData, savedSwapPendingData);
+                // ✅ 2️⃣ SONRA: globalScheduleData'yı güncelle
+                updateGlobalScheduleDataAfterSwap(savedDraggedData, savedSwapPendingData);
 
-            // ✅ 3️⃣ SON OLARAK: ESKİ VIOLATION KAYITLARINI TEMİZLE
-            clearAykiriSwapForStudents(slotsToRemove);
+                // ✅ 3️⃣ SON OLARAK: ESKİ VIOLATION KAYITLARINI TEMİZLE
+                clearAykiriSwapForStudents(slotsToRemove);
 
-            // ═══════════════════════════════════════════════════════════
-            // 🔄 ŞİMDİ YER DEĞİŞTİR (globalScheduleData güncel, eski violation'lar temizlendi)
-            // ═══════════════════════════════════════════════════════════
-            draggedCell.textContent = targetContent;
-            targetCell.textContent = draggedContent;
+                // ═══════════════════════════════════════════════════════════
+                // 🔄 ŞİMDİ YER DEĞİŞTİR (globalScheduleData güncel, eski violation'lar temizlendi)
+                // ═══════════════════════════════════════════════════════════
+                draggedCell.textContent = targetContent;
+                targetCell.textContent = draggedContent;
 
-            // Sınıfları güncelle
-            if (targetContent.trim()) {
+                // Sınıfları güncelle
+                if (targetContent.trim()) {
                 draggedCell.classList.add('draggable-cell');
                 draggedCell.classList.remove('empty-slot');
                 draggedCell.setAttribute('draggable', true);
-            } else {
+                } else {
                 draggedCell.classList.remove('draggable-cell');
                 draggedCell.classList.add('empty-slot');
                 draggedCell.setAttribute('draggable', false);
-            }
+                }
 
-            if (draggedContent.trim()) {
+                if (draggedContent.trim()) {
                 targetCell.classList.add('draggable-cell');
                 targetCell.classList.remove('empty-slot');
                 targetCell.setAttribute('draggable', true);
-            } else {
+                } else {
                 targetCell.classList.remove('draggable-cell');
                 targetCell.classList.add('empty-slot');
                 targetCell.setAttribute('draggable', false);
-            }
+                }
 
-            // ═══════════════════════════════════════════════════════════
-            // 🎨 ÇAKIŞAN SLOTLARI RENKLENDİR (Her grup farklı renk)
-            // ═══════════════════════════════════════════════════════════
-            let totalMarkedSlots = 0;
+                // ═══════════════════════════════════════════════════════════
+                // 🎨 ÇAKIŞAN SLOTLARI RENKLENDİR (Her grup farklı renk)
+                // ═══════════════════════════════════════════════════════════
+                let totalMarkedSlots = 0;
 
-            conflictGroups.forEach(group => {
+                conflictGroups.forEach(group => {
                 // Öğrencinin yeni yerini işaretle (4px border)
                 group.swappedCell.style.border = `4px solid ${group.color}`;
                 group.swappedCell.style.boxSizing = 'border-box';
@@ -10006,13 +10006,13 @@ HTML_TEMPLATE = '''
                 });
 
                 totalMarkedSlots += 1 + group.conflicts.length; // Öğrencinin slotu + çakışan slotlar
-            });
+                });
 
-            // ═══════════════════════════════════════════════════════════
-            // 💾 İHLAL VERİLERİNİ KAYDET (sessionStorage)
-            // ═══════════════════════════════════════════════════════════
-            // Her çakışma grubu için ayrı ihlal kaydı
-            conflictGroups.forEach(group => {
+                // ═══════════════════════════════════════════════════════════
+                // 💾 İHLAL VERİLERİNİ KAYDET (sessionStorage)
+                // ═══════════════════════════════════════════════════════════
+                // Her çakışma grubu için ayrı ihlal kaydı
+                conflictGroups.forEach(group => {
                 // Öğrencinin sınıf bilgisini al
                 const studentClass = studentClassMap[group.studentName.toLocaleUpperCase('tr')];
 
@@ -10050,10 +10050,10 @@ HTML_TEMPLATE = '''
                     },
                     timestamp: new Date().toISOString()
                 });
-            });
+                });
 
-            // 🔄 SAYACI HEMEN GÜNCELLE
-            checkConflictsInBackground();
+                // 🔄 SAYACI HEMEN GÜNCELLE
+                checkConflictsInBackground();
 
                 // Backend'e değişikliği gönder (kaydedilmiş verileri kullan)
                 // NOT: globalScheduleData zaten yukarıda (9936) güncellendi, duplicate önleme için alreadyUpdated=true
